@@ -1,0 +1,197 @@
+import numpy as np
+import random
+
+class basicANN:
+ def __init__(self,wd):
+  self.dimensions=wd
+  self.weights=self._weight_setup(list(wd))
+ def forward_propigate(self,i):
+  return (self._layer(i)[-1]).tolist()
+ def _real(self,l):
+  return np.array(l)
+ def _sig(self,x,d=False):
+  if d:
+   return 2*(1-x)
+  return 1/(1+np.exp(-x))
+ def _weightify(self,a,b):
+  np.random.seed(random.randint(1,100000))
+  return 2*np.random.random((a,b))-1
+ def _error(self,pd,w):
+  return pd.dot(w.T)
+ def _derivative(self,l,e):
+  return e*self._sig(l,d=True)
+ def _weight_add(self,w,r,l,pd):
+  return w+r*l.T.dot(pd)
+ def _weight_setup(self,t):
+  w=[]
+  for i in range(len(t)-1):
+   w.append(self._weightify(t[i],t[i+1]))
+  return w
+  
+ def _layer(self,inp):
+  w=self.weights
+  l=[inp]
+  for i in range(len(w)):
+   s=self._sig(np.dot(l[-1],w[i]))
+   l.append(s)
+  return l
+  
+ def _errorderivative(self,li,o,show=False):
+  der=[]
+  ero=[]
+  w=self.weights.copy()
+  w.reverse()
+  l=li.copy()
+  l.remove(l[0])
+  l.reverse()
+  for i in range(len(w)):
+   if i==0:
+    ero.append(o-l[0])
+   else:
+    ero.append(self._error(der[-1],w[i-1]))
+   der.append(self._derivative(l[i],ero[-1]))
+  if show:
+   return der,ero
+  return [der]
+  
+ def _weight_addup(self,r,lay,der):
+  d=der.copy()
+  #d.reverse()#i think i found the problem, I FINALY DID IT(i fixed a big problem and finaly finished)
+  l=lay.copy()
+  l.reverse()
+  l.remove(l[0])
+  w=self.weights.copy()
+  w.reverse()
+  for i in range(len(w)):
+   w[i]=self._weight_add(w[i],r,l[i],d[i])
+  w.reverse()
+  self.weights=w
+ def train(self,inp,out,rate=0.1,show=False):
+  inp=self._real(inp)
+  out=self._real(out)
+  layers=self._layer(inp)
+  derivatives=self._errorderivative(layers,out,show=show)
+  self._weight_addup(rate,layers,derivatives[0])
+  if show:
+   return derivatives[1]
+
+if __name__=="__main__":
+ net=basicANN((2,3))
+ inp=[[0,0]]
+ out=[[0,0,0]]
+ print(net.train(inp,out,show=True))
+ print(net.forward_propigate(inp))
+
+import nnt as neural
+import random
+def addup(l):
+    b=0
+    for i in l:
+        b+=i
+    b/=len(l)
+    return b
+def vectorize(x,y):
+    z=[]
+    for i in range(y):
+        if (i+1)==x:
+            z.append(1)
+        else:
+            z.append(0)
+    return z
+
+def findpos(x,l):
+    for i in range(len(l)):
+        if x==l[i]:
+            return i
+    return 0
+
+def listmash(l1,l2):
+    for i in l2:
+        l1.append(i)
+    return l1
+
+def datamash(lol):
+    z=lol[0]
+    for i in range(len(lol)-1):
+        z=listmash(z,lol[i+1])
+    return z
+
+def reader(l):
+    ma=max(l)
+    for i in range(len(l)):
+        if l[i]==ma:
+            return i
+
+net=neural.basicANN
+
+prev=10
+c=""
+l=list("abcdefghijklmnopqrstuvwxyz1234567890\n?!., ")
+filedata=(open("testdata/readable.txt","r").read()).lower()
+
+for i in list(filedata):
+    
+    if i in l:
+        c+=i
+
+filedata=c.split(" ")
+
+newdata=[]
+
+for i in filedata:
+    if i not in newdata:
+        newdata.append(i)
+inp=[]
+out=[]
+for i in range(len(filedata)-prev):
+    b=[]
+    for a in range(prev):
+        b.append(vectorize(findpos(filedata[a+i],newdata),len(newdata)))
+    inp.append(datamash(b))
+    out.append(vectorize(findpos(filedata[a+i],newdata),len(newdata)))
+print(len(newdata)*prev)
+unk=len(newdata)*prev
+net=net((unk,unk/(prev/3),unk/(prev/2),unk/prev))
+when=100
+execu=10000
+ezu=0
+print("data set up")
+for i in range(execu):
+    ze=i%len(inp)
+    y=net.train([inp[ze]],[out[ze]],show=True,rate=0.0008)[0]
+    if (i%when)==0:
+        print((i*100/execu),"% done")
+        eze=[]
+        for i in y:
+            eze.append(addup(i))
+        eze=(addup(eze)**2)**(1/2)
+        eze=100-(eze*100)
+        print("accuracy:",eze)
+        print("improvement:",eze-ezu)
+        ezu=eze
+
+for aq in range(10):
+    print(aq+1,":")
+    sent=[]
+    if len(sent)<prev:
+        for i in range(prev-len(sent)):
+            sent.append(random.choice(newdata))
+    sent[-1]="begin:"
+    for i in range(75):
+        b=[]
+        new=[]
+        for a in range(prev):
+            new.append(sent[-(a+1)])
+        new.reverse()
+        for a in range(prev):
+            b.append(vectorize(findpos(new[a],newdata),len(newdata)))
+        inp=datamash(b)
+        z=net.forward_propigate(inp)
+        z=newdata[reader(z)]
+        sent.append(z)
+    print(" ".join(sent)+"\n")
+
+if "Y" in list(input().upper()):
+    z=open("word generation data.txt","w")
+    z.write("weights="+str(net.weights))
+    z.close()
